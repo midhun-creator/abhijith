@@ -1,0 +1,3206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NSS Report Builder</title>
+<meta name="description" content="Interactive NSS Programme Report Builder with WYSIWYG editing and PDF export">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js"></script>
+<style>
+/* ============================================
+   1. CSS VARIABLES & RESET
+   ============================================ */
+:root {
+  --accent: #1a3c6e;
+  --accent-light: #2a5ea8;
+  --accent-lighter: #e8f0fe;
+  --accent-dark: #0d1f3c;
+  --bg-app: #eef1f5;
+  --bg-sidebar: #ffffff;
+  --bg-toolbar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f3f7;
+  --text-primary: #1a1a2e;
+  --text-secondary: #5a5a7a;
+  --text-muted: #9a9ab0;
+  --border: #e2e5ea;
+  --border-light: #f0f0f5;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,0.15);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --sidebar-width: 300px;
+  --topbar-height: 56px;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html { font-size: 16px; height: 100%; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  line-height: 1.5;
+}
+
+/* ============================================
+   2. TOP BAR
+   ============================================ */
+#topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--topbar-height);
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  z-index: 1000;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-sm);
+}
+
+#topbar .logo-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+}
+
+#topbar .logo-area svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+
+#topbar .logo-area span {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent);
+  letter-spacing: -0.3px;
+}
+
+#topbar .center-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+#topbar .actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.topbar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.topbar-btn.primary {
+  background: var(--accent);
+  color: white;
+}
+
+.topbar-btn.primary:hover {
+  background: var(--accent-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26, 60, 110, 0.3);
+}
+
+.topbar-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* (save-status removed — no auto-save) */
+
+/* ============================================
+   3. SIDEBAR
+   ============================================ */
+#sidebar {
+  position: fixed;
+  top: var(--topbar-height);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 900;
+  transition: transform var(--transition);
+  display: flex;
+  flex-direction: column;
+}
+
+#sidebar::-webkit-scrollbar { width: 5px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+.sidebar-header {
+  padding: 16px 16px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.section-list {
+  padding: 0 8px 16px;
+  flex: 1;
+}
+
+.section-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  user-select: none;
+  gap: 10px;
+}
+
+.section-item:hover {
+  background: var(--bg-hover);
+}
+
+.section-item.active {
+  background: var(--accent-lighter);
+  color: var(--accent);
+}
+
+.section-item .drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.section-item:hover .drag-handle { opacity: 1; }
+.section-item .drag-handle:active { cursor: grabbing; }
+
+.section-item .section-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.section-item .section-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.section-item:hover .section-actions { opacity: 1; }
+
+.section-action-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.section-action-btn:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+.section-action-btn svg { width: 14px; height: 14px; }
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 2px;
+  bottom: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(16px);
+}
+
+/* Sidebar Bottom */
+.sidebar-bottom {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+  width: 100%;
+}
+
+.sidebar-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-lighter);
+}
+
+.sidebar-btn svg { width: 16px; height: 16px; }
+
+/* Theme Section in Sidebar */
+.theme-section {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.theme-section label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.color-swatch:hover { transform: scale(1.15); }
+
+.color-swatch.active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--bg-sidebar);
+}
+
+.color-swatch.active::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* ============================================
+   4. DOCUMENT AREA
+   ============================================ */
+#doc-area {
+  position: fixed;
+  top: var(--topbar-height);
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: var(--bg-app);
+  display: flex;
+  justify-content: center;
+  padding: 30px 20px 80px;
+}
+
+#doc-area::-webkit-scrollbar { width: 8px; }
+#doc-area::-webkit-scrollbar-track { background: transparent; }
+#doc-area::-webkit-scrollbar-thumb {
+  background: #c0c0c8;
+  border-radius: 10px;
+}
+
+#document {
+  width: 210mm;
+  min-height: 297mm;
+  flex-shrink: 0;
+}
+
+.doc-page {
+  width: 210mm;
+  min-height: 297mm;
+  background: white;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 30px;
+  position: relative;
+  padding: 30mm 25.4mm 30mm 25.4mm;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12pt;
+  line-height: 1.15;
+  color: #000;
+  border-radius: 2px;
+  overflow: visible;
+}
+
+/* Double page border */
+.doc-page::before {
+  content: '';
+  position: absolute;
+  top: 6mm;
+  left: 6mm;
+  right: 6mm;
+  bottom: 6mm;
+  border: 1.5pt solid #000;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.doc-page::after {
+  content: '';
+  position: absolute;
+  top: 8mm;
+  left: 8mm;
+  right: 8mm;
+  bottom: 8mm;
+  border: 0.5pt solid #000;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ============================================
+   5. DOCUMENT CONTENT STYLES (matching LaTeX)
+   ============================================ */
+.doc-section {
+  position: relative;
+  transition: outline 0.15s ease;
+  border-radius: 3px;
+}
+
+.doc-section:hover {
+  outline: 2px solid rgba(26, 60, 110, 0.15);
+  outline-offset: 4px;
+}
+
+.doc-section.hidden-section {
+  display: none;
+}
+
+/* Title Page */
+.title-page {
+  text-align: center;
+  padding-top: 0;
+}
+
+.logo-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12pt;
+}
+
+.logo-slot {
+  width: 48%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80px;
+  position: relative;
+}
+
+.logo-slot img {
+  max-width: 2.5cm;
+  max-height: 2.5cm;
+  object-fit: contain;
+}
+
+.logo-placeholder {
+  width: 2.5cm;
+  height: 2.5cm;
+  border: 2px dashed #ccc;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  cursor: pointer;
+  transition: var(--transition);
+  gap: 4px;
+}
+
+.logo-placeholder:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-lighter);
+}
+
+.logo-placeholder svg {
+  width: 20px;
+  height: 20px;
+}
+
+.logo-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  border-radius: var(--radius-sm);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 5;
+}
+
+.logo-slot:hover .logo-overlay {
+  display: flex;
+}
+
+.logo-overlay button {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+}
+
+.logo-overlay .replace-btn {
+  background: white;
+  color: #333;
+}
+
+.logo-overlay .remove-btn {
+  background: var(--danger);
+  color: white;
+}
+
+.college-name {
+  font-size: 14pt;
+  font-weight: bold;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.department-line {
+  font-size: 10pt;
+  margin-bottom: 12pt;
+}
+
+.unit-number {
+  font-size: 13pt;
+  font-weight: bold;
+  margin-bottom: 24pt;
+}
+
+.report-title {
+  font-size: 14pt;
+  font-weight: bold;
+  margin-bottom: 6pt;
+}
+
+.programme-name {
+  font-size: 18pt;
+  font-weight: bold;
+  line-height: 1.3;
+  margin-bottom: 10pt;
+}
+
+.date-venue {
+  font-size: 12pt;
+  margin-bottom: 20pt;
+}
+
+.main-photo-container {
+  margin: 10pt auto 20pt;
+  max-width: 60%;
+  position: relative;
+}
+
+.main-photo-container img {
+  width: 100%;
+  border-radius: 2px;
+}
+
+.photo-placeholder {
+  width: 100%;
+  height: 200px;
+  border: 2px dashed #ccc;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  transition: var(--transition);
+  gap: 8px;
+}
+
+.photo-placeholder:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(26,60,110,0.03);
+}
+
+.photo-placeholder svg { width: 32px; height: 32px; }
+
+.prepared-by {
+  font-weight: bold;
+  font-size: 12pt;
+  line-height: 1.5;
+}
+
+/* Section Headings */
+.section-heading {
+  font-size: 14pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  padding-bottom: 6pt;
+  border-bottom: 0.8pt solid #000;
+  margin-top: 14pt;
+  margin-bottom: 10pt;
+  outline: none;
+}
+
+.section-heading:focus {
+  border-bottom-color: var(--accent);
+}
+
+/* Tables */
+.details-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10pt 0;
+  font-size: 12pt;
+}
+
+.details-table td,
+.details-table th {
+  padding: 6pt 10pt;
+  text-align: left;
+  vertical-align: top;
+  outline: none;
+  min-width: 40px;
+}
+
+.details-table.booktabs {
+  border-top: 1.5pt solid #000;
+  border-bottom: 1.5pt solid #000;
+}
+
+.details-table.booktabs thead tr {
+  border-bottom: 0.8pt solid #000;
+}
+
+.details-table.bordered td,
+.details-table.bordered th {
+  border: 1px solid #000;
+}
+
+.details-table td:first-child {
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+/* Participant Table */
+.participant-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10pt 0;
+  font-size: 12pt;
+}
+
+.participant-table th,
+.participant-table td {
+  padding: 5pt 12pt;
+  border: 1px solid #000;
+  text-align: left;
+  outline: none;
+  min-width: 30px;
+}
+
+.participant-table th {
+  font-weight: bold;
+  text-align: center;
+  background: rgba(0,0,0,0.03);
+}
+
+.participant-table td:first-child {
+  text-align: center;
+  width: 50px;
+}
+
+.participant-table td:last-child {
+  text-align: center;
+  width: 100px;
+}
+
+/* Body text */
+.body-text {
+  text-align: justify;
+  margin-bottom: 8pt;
+  outline: none;
+  min-height: 1em;
+}
+
+.body-text:empty::before {
+  content: 'Click to edit text...';
+  color: #ccc;
+  font-style: italic;
+  font-family: 'Inter', sans-serif;
+  font-size: 11pt;
+}
+
+/* Photo Gallery */
+.photo-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12pt;
+  justify-content: center;
+  margin: 8pt 0;
+}
+
+.gallery-item {
+  width: calc(50% - 8pt);
+  text-align: center;
+  position: relative;
+}
+
+.gallery-item.single-centered {
+  width: calc(50% - 8pt);
+}
+
+.gallery-item img {
+  width: 95%;
+  border-radius: 2px;
+  display: block;
+  margin: 0 auto;
+}
+
+.gallery-item .caption {
+  font-size: 10pt;
+  margin-top: 4pt;
+  outline: none;
+  font-style: italic;
+}
+
+.gallery-item .caption:empty::before {
+  content: 'Add caption...';
+  color: #ccc;
+}
+
+.gallery-photo-placeholder {
+  width: 95%;
+  height: 150px;
+  border: 2px dashed #ccc;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  cursor: pointer;
+  margin: 0 auto;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  transition: var(--transition);
+  gap: 4px;
+}
+
+.gallery-photo-placeholder:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.gallery-photo-overlay {
+  position: absolute;
+  top: 0;
+  left: 2.5%;
+  right: 2.5%;
+  bottom: 30px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 2px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.gallery-item:hover .gallery-photo-overlay {
+  display: flex;
+}
+
+.gallery-photo-overlay button {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  background: white;
+  color: #333;
+}
+
+.gallery-photo-overlay .remove-photo-btn {
+  background: var(--danger);
+  color: white;
+}
+
+/* Add photo button */
+.add-gallery-photo {
+  width: calc(50% - 8pt);
+  min-height: 150px;
+  border: 2px dashed #ddd;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #bbb;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  transition: var(--transition);
+  gap: 6px;
+}
+
+.add-gallery-photo:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(26,60,110,0.02);
+}
+
+/* Table action buttons */
+.table-actions {
+  display: none;
+  position: absolute;
+  top: -30px;
+  right: 0;
+  gap: 4px;
+  font-family: 'Inter', sans-serif;
+  z-index: 10;
+}
+
+.doc-section:hover .table-actions {
+  display: flex;
+}
+
+.table-action-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: white;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.table-action-btn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* ============================================
+   6. RICH TEXT TOOLBAR (Floating)
+   ============================================ */
+#rich-toolbar {
+  position: fixed;
+  display: none;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  box-shadow: var(--shadow-lg);
+  z-index: 2000;
+  align-items: center;
+  gap: 2px;
+  animation: toolbarFadeIn 0.15s ease;
+  flex-wrap: wrap;
+  max-width: 520px;
+}
+
+#rich-toolbar.visible { display: flex; }
+
+@keyframes toolbarFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rt-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.rt-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.rt-btn.active {
+  background: var(--accent-lighter);
+  color: var(--accent);
+}
+
+.rt-btn svg { width: 16px; height: 16px; }
+
+.rt-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 3px;
+}
+
+.rt-select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: white;
+  cursor: pointer;
+  outline: none;
+  max-width: 100px;
+}
+
+.rt-color-input {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-radius: 5px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  overflow: hidden;
+}
+
+.rt-color-input::-webkit-color-swatch-wrapper { padding: 2px; }
+.rt-color-input::-webkit-color-swatch { border: none; border-radius: 3px; }
+
+/* ============================================
+   7. MODALS
+   ============================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+  z-index: 5000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  animation: modalBgIn 0.2s ease;
+}
+
+.modal-overlay.visible { display: flex; }
+
+@keyframes modalBgIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: var(--shadow-xl);
+  animation: modalSlideIn 0.25s ease;
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.modal-field {
+  margin-bottom: 16px;
+}
+
+.modal-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+}
+
+.modal-field input,
+.modal-field select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: var(--transition);
+}
+
+.modal-field input:focus,
+.modal-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-lighter);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.modal-btn {
+  padding: 10px 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.modal-btn.cancel {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.modal-btn.cancel:hover { background: var(--border); }
+
+.modal-btn.confirm {
+  background: var(--accent);
+  color: white;
+}
+
+.modal-btn.confirm:hover {
+  background: var(--accent-light);
+  transform: translateY(-1px);
+}
+
+/* Checkbox in modal */
+.modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.modal-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+/* Section type picker */
+.section-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.section-type-card {
+  padding: 18px 14px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-type-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-lighter);
+  transform: translateY(-2px);
+}
+
+.section-type-card svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+
+.section-type-card span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ============================================
+   8. DARK MODE
+   ============================================ */
+body.dark-mode {
+  --bg-app: #0f0f1a;
+  --bg-sidebar: #1a1a2e;
+  --bg-toolbar: #1a1a2e;
+  --bg-card: #16213e;
+  --bg-hover: #252545;
+  --text-primary: #e0e0f0;
+  --text-secondary: #9a9ab8;
+  --text-muted: #6a6a88;
+  --border: #2a2a4a;
+  --border-light: #222244;
+  --accent-lighter: rgba(42,94,168,0.2);
+}
+
+body.dark-mode .modal {
+  background: #1a1a2e;
+  border: 1px solid var(--border);
+}
+
+body.dark-mode .rt-select {
+  background: #16213e;
+  color: #e0e0f0;
+  border-color: #2a2a4a;
+}
+
+body.dark-mode #rich-toolbar {
+  background: #1a1a2e;
+  border-color: #2a2a4a;
+}
+
+/* Document stays light in dark mode */
+body.dark-mode .doc-page {
+  background: white;
+  color: #000;
+}
+
+/* ============================================
+   9. PRINT / PREVIEW STYLES
+   ============================================ */
+body.print-preview #topbar,
+body.print-preview #sidebar,
+body.print-preview #rich-toolbar {
+  display: none !important;
+}
+
+body.print-preview #doc-area {
+  left: 0;
+  top: 0;
+  background: #555;
+  padding: 20px;
+}
+
+body.print-preview .doc-section:hover {
+  outline: none;
+}
+
+body.print-preview .logo-placeholder,
+body.print-preview .photo-placeholder,
+body.print-preview .gallery-photo-placeholder,
+body.print-preview .add-gallery-photo,
+body.print-preview .table-actions,
+body.print-preview .logo-overlay,
+body.print-preview .gallery-photo-overlay {
+  display: none !important;
+}
+
+body.print-preview .body-text:empty::before {
+  display: none;
+}
+
+/* Preview exit button */
+#exit-preview {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 9999;
+  display: none;
+  box-shadow: var(--shadow-lg);
+  transition: var(--transition);
+}
+
+body.print-preview #exit-preview { display: block; }
+
+#exit-preview:hover {
+  background: var(--accent-light);
+  transform: scale(1.05);
+}
+
+@media print {
+  #topbar, #sidebar, #rich-toolbar, #exit-preview { display: none !important; }
+  #doc-area {
+    position: static;
+    overflow: visible;
+    background: white;
+    padding: 0;
+  }
+  .doc-page {
+    box-shadow: none;
+    margin: 0;
+    page-break-after: always;
+  }
+  .doc-section:hover { outline: none; }
+}
+
+/* ============================================
+   10. ANIMATIONS & UTILITIES
+   ============================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.fade-in { animation: fadeIn 0.3s ease; }
+
+/* Editable highlight */
+[contenteditable="true"]:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(26, 60, 110, 0.2);
+  border-radius: 2px;
+}
+
+[contenteditable="true"] {
+  cursor: text;
+}
+
+/* Sortable ghost */
+.sortable-ghost {
+  opacity: 0.4;
+  background: var(--accent-lighter) !important;
+}
+
+.sortable-chosen {
+  background: var(--accent-lighter) !important;
+}
+
+/* Hidden file inputs */
+.hidden-input { display: none; }
+
+/* Notification toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  background: var(--accent-dark);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.3s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+
+/* Responsive */
+@media (max-width: 900px) {
+  :root { --sidebar-width: 0px; }
+  #sidebar { transform: translateX(-100%); }
+  #sidebar.open { transform: translateX(0); width: 280px; }
+}
+
+/* Page number badge (editor only, hidden in print) */
+.page-number-badge {
+  position: absolute;
+  bottom: 3mm;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Times New Roman', serif;
+  font-size: 10pt;
+  color: #333;
+  pointer-events: none;
+  z-index: 2;
+}
+@media print { .page-number-badge { display: none; } }
+body.print-preview .page-number-badge { display: none; }
+
+/* Gallery drag handle */
+.gallery-item .gallery-drag-handle {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  cursor: grab;
+  background: rgba(255,255,255,0.85);
+  border-radius: 4px;
+  padding: 3px 4px;
+  display: none;
+  z-index: 6;
+  color: #555;
+}
+.gallery-item:hover .gallery-drag-handle { display: flex; align-items: center; justify-content: center; }
+.gallery-item .gallery-drag-handle:active { cursor: grabbing; }
+
+/* Delete button variant in sidebar */
+.section-action-btn.delete-btn:hover {
+  background: #fee2e2;
+  color: var(--danger);
+}
+/* Insert position indicator */
+.insert-here-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  margin: 2px 8px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-lighter);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+  width: calc(100% - 16px);
+}
+.insert-here-btn.visible { display: flex; }
+.section-item.active-insert { background: var(--accent-lighter); outline: 2px solid var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ==================== TOP BAR ==================== -->
+<header id="topbar">
+  <div class="logo-area">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    <span>NSS Report Builder</span>
+  </div>
+
+  <div class="center-section">
+    <button class="topbar-btn" onclick="doUndo()" title="Undo (Ctrl+Z)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+    </button>
+    <button class="topbar-btn" onclick="doRedo()" title="Redo (Ctrl+Y)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+    </button>
+  </div>
+
+  <div class="actions">
+    <button class="topbar-btn" onclick="togglePrintPreview()" title="Print Preview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      Preview
+    </button>
+    <div class="topbar-divider"></div>
+    <button class="topbar-btn" onclick="exportProject()" title="Save Project as JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save
+    </button>
+    <button class="topbar-btn" onclick="document.getElementById('import-input').click()" title="Load Project from JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Load
+    </button>
+    <input type="file" id="import-input" class="hidden-input" accept=".json" onchange="importProject(event)">
+    <div class="topbar-divider"></div>
+    <button class="topbar-btn primary" onclick="exportPDF()" title="Export as PDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      PDF
+    </button>
+    <button class="topbar-btn" onclick="exportDOCX()" title="Export as DOCX">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      DOCX
+    </button>
+    <div class="topbar-divider"></div>
+    <button class="topbar-btn" onclick="toggleDarkMode()" id="dark-mode-btn" title="Toggle Dark Mode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ==================== SIDEBAR ==================== -->
+<aside id="sidebar">
+  <div class="sidebar-header">Sections</div>
+  <div class="section-list" id="section-list">
+    <!-- Populated by JS -->
+  </div>
+
+  <div class="theme-section">
+    <label>Accent Color</label>
+    <div class="color-palette" id="color-palette">
+      <!-- Populated by JS -->
+    </div>
+    <div style="margin-top:10px">
+      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:6px">Custom Color</label>
+      <input type="color" id="custom-accent" value="#1a3c6e" style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;cursor:pointer;margin-top:4px" onchange="setAccentColor(this.value)">
+    </div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <button class="sidebar-btn" onclick="showAddSectionModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add New Section
+    </button>
+  </div>
+</aside>
+
+<!-- ==================== DOCUMENT AREA ==================== -->
+<main id="doc-area">
+  <div id="document">
+    <!-- Populated by JS -->
+  </div>
+</main>
+
+<!-- ==================== RICH TEXT TOOLBAR ==================== -->
+<div id="rich-toolbar">
+  <select class="rt-select" id="rt-font" onchange="applyFont(this.value)" title="Font Family">
+    <option value="Times New Roman">Times New Roman</option>
+    <option value="Arial">Arial</option>
+    <option value="Georgia">Georgia</option>
+    <option value="Verdana">Verdana</option>
+    <option value="Courier New">Courier New</option>
+    <option value="Helvetica">Helvetica</option>
+    <option value="Palatino Linotype">Palatino</option>
+    <option value="Garamond">Garamond</option>
+  </select>
+  <select class="rt-select" id="rt-size" onchange="applyFontSize(this.value)" title="Font Size" style="width:60px">
+    <option value="1">8pt</option>
+    <option value="2">10pt</option>
+    <option value="3" selected>12pt</option>
+    <option value="4">14pt</option>
+    <option value="5">18pt</option>
+    <option value="6">24pt</option>
+    <option value="7">36pt</option>
+  </select>
+  <div class="rt-divider"></div>
+  <button class="rt-btn" onclick="execCmd('bold')" title="Bold (Ctrl+B)"><b>B</b></button>
+  <button class="rt-btn" onclick="execCmd('italic')" title="Italic (Ctrl+I)"><i>I</i></button>
+  <button class="rt-btn" onclick="execCmd('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
+  <button class="rt-btn" onclick="execCmd('strikeThrough')" title="Strikethrough"><s>S</s></button>
+  <div class="rt-divider"></div>
+  <button class="rt-btn" onclick="execCmd('justifyLeft')" title="Align Left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+  </button>
+  <button class="rt-btn" onclick="execCmd('justifyCenter')" title="Align Center">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
+  </button>
+  <button class="rt-btn" onclick="execCmd('justifyRight')" title="Align Right">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+  </button>
+  <button class="rt-btn" onclick="execCmd('justifyFull')" title="Justify">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+  </button>
+  <div class="rt-divider"></div>
+  <input type="color" class="rt-color-input" id="rt-text-color" value="#000000" onchange="execCmdVal('foreColor', this.value)" title="Text Color">
+  <input type="color" class="rt-color-input" id="rt-highlight" value="#ffff00" onchange="execCmdVal('hiliteColor', this.value)" title="Highlight Color">
+</div>
+
+<!-- ==================== EXIT PREVIEW ==================== -->
+<button id="exit-preview" onclick="togglePrintPreview()">✕ Exit Preview</button>
+
+<!-- ==================== ADD SECTION MODAL ==================== -->
+<div class="modal-overlay" id="add-section-modal">
+  <div class="modal">
+    <h3>Add New Section</h3>
+    <div class="section-type-grid">
+      <div class="section-type-card" onclick="addSection('text')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        <span>Text Section</span>
+      </div>
+      <div class="section-type-card" onclick="addSection('table')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+        <span>Table</span>
+      </div>
+      <div class="section-type-card" onclick="addSection('gallery')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span>Photo Gallery</span>
+      </div>
+      <div class="section-type-card" onclick="addSection('list')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span>List Section</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal('add-section-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TABLE BUILDER MODAL ==================== -->
+<div class="modal-overlay" id="table-builder-modal">
+  <div class="modal">
+    <h3>Insert Custom Table</h3>
+    <div class="modal-field">
+      <label>Rows</label>
+      <input type="number" id="tb-rows" min="1" max="50" value="3">
+    </div>
+    <div class="modal-field">
+      <label>Columns</label>
+      <input type="number" id="tb-cols" min="1" max="10" value="3">
+    </div>
+    <div class="modal-field">
+      <label class="modal-checkbox">
+        <input type="checkbox" id="tb-header" checked>
+        Include header row
+      </label>
+    </div>
+    <div class="modal-field">
+      <label>Border Style</label>
+      <select id="tb-border">
+        <option value="bordered">Full Borders</option>
+        <option value="booktabs">Header Only (Booktabs)</option>
+        <option value="none">No Borders</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal('table-builder-modal')">Cancel</button>
+      <button class="modal-btn confirm" onclick="insertCustomTable()">Insert Table</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== HIDDEN FILE INPUTS ==================== -->
+<input type="file" id="logo-left-input" class="hidden-input" accept="image/*" onchange="handleLogoUpload('left', event)">
+<input type="file" id="logo-right-input" class="hidden-input" accept="image/*" onchange="handleLogoUpload('right', event)">
+<input type="file" id="main-photo-input" class="hidden-input" accept="image/*" onchange="handleMainPhoto(event)">
+<input type="file" id="gallery-photo-input" class="hidden-input" accept="image/*">
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+// ============================================
+// 1. STATE & CONFIGURATION
+// ============================================
+const ACCENT_COLORS = [
+  { name: 'Navy', value: '#1a3c6e' },
+  { name: 'Teal', value: '#0d7377' },
+  { name: 'Forest', value: '#2d6a4f' },
+  { name: 'Maroon', value: '#6b1d2a' },
+  { name: 'Purple', value: '#4a2574' },
+  { name: 'Charcoal', value: '#2c3e50' },
+  { name: 'Rust', value: '#a0522d' },
+  { name: 'Royal Blue', value: '#2554c7' },
+  { name: 'Crimson', value: '#9b111e' },
+  { name: 'Olive', value: '#556b2f' },
+];
+
+let undoStack = [];
+let redoStack = [];
+let isUndoing = false;
+let saveTimeout = null;
+let currentAccent = '#1a3c6e';
+let gallerySectionTarget = null;
+let activeSectionId = null;  // tracks which section was last clicked/active
+
+// Default sections configuration
+const defaultSections = [
+  { id: 'title-page', name: 'Title Page', type: 'title', visible: true },
+  { id: 'programme-details', name: 'Programme Details', type: 'detail-table', visible: true },
+  { id: 'introduction', name: 'Introduction', type: 'text', visible: true },
+  { id: 'activities', name: 'Activities Conducted', type: 'text', visible: true },
+  { id: 'participants', name: 'Participants', type: 'participant-table', visible: true, optional: true },
+  { id: 'photo-gallery', name: 'Photo Gallery', type: 'gallery', visible: true },
+  { id: 'conclusion', name: 'Acknowledgement & Conclusion', type: 'text', visible: true },
+];
+
+let sections = JSON.parse(JSON.stringify(defaultSections));
+
+// ============================================
+// 2. INITIALIZATION
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+  renderSidebar();
+  renderDocument();
+  initSortable();
+  initKeyboardShortcuts();
+  initRichToolbar();
+  renderColorPalette();
+  setTimeout(() => pushUndoState(), 500);
+});
+
+// localStorage removed — no auto-save
+
+// ============================================
+// 3. RENDERING
+// ============================================
+function renderSidebar() {
+  const list = document.getElementById('section-list');
+  list.innerHTML = sections.map((s, i) => {
+    const isTitle = s.type === 'title';
+    return `
+    <div class="section-item ${isTitle ? '' : ''}" data-id="${s.id}" onclick="scrollToSection('${s.id}')">
+      <span class="drag-handle" style="${isTitle ? 'visibility:hidden' : ''}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg>
+      </span>
+      <span class="section-name">${s.name}</span>
+      <div class="section-actions">
+        <button class="section-action-btn" onclick="event.stopPropagation(); renameSection('${s.id}')" title="Rename">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="section-action-btn" onclick="event.stopPropagation(); duplicateSection('${s.id}')" title="Duplicate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        ${!isTitle ? `<button class="section-action-btn delete-btn" onclick="event.stopPropagation(); deleteSection('${s.id}')" title="Delete">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>` : ''}
+      </div>
+      <label class="toggle-switch" onclick="event.stopPropagation()">
+        <input type="checkbox" ${s.visible ? 'checked' : ''} onchange="toggleSection('${s.id}', this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  `}).join('');
+}
+
+function renderDocument() {
+  const doc = document.getElementById('document');
+  let html = '';
+  let contentPageNum = 0;
+
+  sections.forEach(s => {
+    const isTitle = s.type === 'title';
+    const hiddenClass = s.visible ? '' : 'hidden-section';
+    const pageLabel = isTitle ? 'Title Page' : `Page ${++contentPageNum}`;
+
+    html += `<div class="doc-page" id="doc-page-${s.id}" data-page-section="${s.id}" style="position:relative">
+      <div class="page-number-badge">${pageLabel}</div>
+      <div class="doc-section ${hiddenClass}" id="section-${s.id}" data-section-id="${s.id}">`;
+
+    switch(s.type) {
+      case 'title':           html += renderTitlePage(s);        break;
+      case 'detail-table':    html += renderDetailTable(s);      break;
+      case 'text':            html += renderTextSection(s);      break;
+      case 'participant-table': html += renderParticipantTable(s); break;
+      case 'gallery':         html += renderGallery(s);          break;
+      case 'table':           html += renderCustomTable(s);      break;
+      case 'list':            html += renderListSection(s);      break;
+    }
+
+    html += `</div></div>`;
+  });
+
+  doc.innerHTML = html;
+  reattachEventListeners();
+}
+
+function renderTitlePage(s) {
+  return `
+    <div class="title-page">
+      <div class="logo-row">
+        <div class="logo-slot" id="logo-left">
+          <div class="logo-placeholder" onclick="document.getElementById('logo-left-input').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span>College Logo</span>
+          </div>
+        </div>
+        <div class="logo-slot" id="logo-right">
+          <div class="logo-placeholder" onclick="document.getElementById('logo-right-input').click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span>NSS Logo</span>
+          </div>
+        </div>
+      </div>
+      <p class="college-name" contenteditable="true">GOVERNMENT POLYTECHNIC COLLEGE, PALAKKAD</p>
+      <p class="department-line" contenteditable="true">(Department of Technical Education, Government of Kerala)</p>
+      <p class="unit-number" contenteditable="true">NSS UNIT NO: 130</p>
+      <p class="report-title" contenteditable="true">PROGRAMME REPORT</p>
+      <p class="programme-name" contenteditable="true">Ekta Dina March<br>(Sardar@150)</p>
+      <p class="date-venue" contenteditable="true"><b>Date:</b> 04/11/2025 &nbsp;|&nbsp; <b>Venue:</b> Fort Maidan to Victoria College</p>
+      <div class="main-photo-container" id="main-photo-area">
+        <div class="photo-placeholder" onclick="document.getElementById('main-photo-input').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span>Click to upload main photo</span>
+        </div>
+      </div>
+      <p class="prepared-by" contenteditable="true">Prepared By: NSS Unit No. 130<br>Government Polytechnic College, Palakkad</p>
+    </div>
+  `;
+}
+
+function renderDetailTable(s) {
+  return `
+    <h2 class="section-heading" contenteditable="true">${s.name}</h2>
+    <div style="position:relative">
+      <div class="table-actions">
+        <button class="table-action-btn" onclick="addDetailRow(this)">+ Row</button>
+        <button class="table-action-btn" onclick="removeLastRow(this)">− Row</button>
+      </div>
+      <table class="details-table booktabs">
+        <tbody>
+          <tr><td contenteditable="true">Activity Name</td><td contenteditable="true">Ekta Dina March (Sardar@150 District Walk)</td></tr>
+          <tr><td contenteditable="true">Category</td><td contenteditable="true">National Integration &amp; Unity</td></tr>
+          <tr><td contenteditable="true">Date &amp; Duration</td><td contenteditable="true">04/11/2025 (9:00 AM – 12:00 PM)</td></tr>
+          <tr><td contenteditable="true">Venue</td><td contenteditable="true">Fort Maidan to Victoria College, Palakkad</td></tr>
+          <tr><td contenteditable="true">Organizers</td><td contenteditable="true">Mera Yuva Bharat (MYB) &amp; NSS</td></tr>
+          <tr><td contenteditable="true">Participants</td><td contenteditable="true">43 NSS Volunteers from GPTC Palakkad</td></tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTextSection(s) {
+  const defaultTexts = {
+    'Introduction': `<p class="body-text" contenteditable="true">The Ekta Dina March was organized as part of the <i>Sardar@150</i> district-level walk, a collaborative effort by Mera Yuva Bharat (MYB) Palakkad and the National Service Scheme (NSS). The event was held on November 4, 2025, commencing at Fort Maidan, Palakkad. The primary objective of the march was to uphold the message of unity and national integration, bringing together youth from various institutions to move forward together without differences.</p>`,
+    'Activities Conducted': `<p class="body-text" contenteditable="true">The programme began at 9:00 AM with a gathering at Fort Maidan, near the historic five lamps. A welcome speech set the tone for the event, attended by several officials and NSS coordinators from various colleges.</p><p class="body-text" contenteditable="true">To symbolize unity, all participants were distributed special white clothes printed specifically for the occasion. The march commenced from Fort Maidan and concluded at Victoria College. The procession highlighted the importance of solidarity and collective progress. NSS students from Government Polytechnic College, Palakkad, actively participated in the walk, demonstrating their commitment to national values.</p>`,
+    'Acknowledgement & Conclusion': `<p class="body-text" contenteditable="true">We express our heartfelt gratitude to Mera Yuva Bharat (MYB) Palakkad for successfully organizing this grand event aimed at strengthening Indian unity. We also thank the National Service Scheme (NSS) authorities and the NSS Programme Officer for providing our students the opportunity to participate. Finally, we appreciate the dedication of all 43 student volunteers who made this event a success.</p>`,
+  };
+  
+  const text = defaultTexts[s.name] || '<p class="body-text" contenteditable="true"></p>';
+  
+  return `
+    <h2 class="section-heading" contenteditable="true">${s.name}</h2>
+    <div class="text-content">${text}</div>
+  `;
+}
+
+function renderParticipantTable(s) {
+  // Generic placeholder rows — edit directly in the table
+  const placeholders = [
+    ['Participant 1','Dept A'],['Participant 2','Dept A'],['Participant 3','Dept B'],
+    ['Participant 4','Dept B'],['Participant 5','Dept C'],
+  ];
+
+  const rows = placeholders.map((p, i) =>
+    `<tr><td contenteditable="true">${i+1}</td><td contenteditable="true">${p[0]}</td><td contenteditable="true">${p[1]}</td></tr>`
+  ).join('');
+
+  return `
+    <h2 class="section-heading" contenteditable="true">Participants</h2>
+    <p class="body-text" contenteditable="true">A total of [N] NSS students participated in this programme.</p>
+    <div style="position:relative">
+      <div class="table-actions">
+        <button class="table-action-btn" onclick="addParticipantRow(this)">+ Row</button>
+        <button class="table-action-btn" onclick="removeLastRow(this)">− Row</button>
+        <button class="table-action-btn" onclick="addTableColumn(this)">+ Column</button>
+        <button class="table-action-btn" onclick="removeLastColumn(this)">− Column</button>
+        <button class="table-action-btn" onclick="mergeCells(this)">Merge Cells</button>
+      </div>
+      <table class="participant-table">
+        <thead>
+          <tr><th contenteditable="true">S.No</th><th contenteditable="true">Name</th><th contenteditable="true">Department</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderGallery(s) {
+  return `
+    <h2 class="section-heading" contenteditable="true">Photo Gallery</h2>
+    <p style="font-size:10pt;color:#888;font-family:'Inter',sans-serif;margin-bottom:6pt">Drag photos to reorder. Click placeholder to upload.</p>
+    <div class="photo-gallery" id="gallery-${s.id}">
+      ${renderGallerySlot(s.id, 0, 'Caption 1', 'Description for photo 1')}
+      ${renderGallerySlot(s.id, 1, 'Caption 2', 'Description for photo 2')}
+      ${renderGallerySlot(s.id, 2, 'Caption 3', 'Description for photo 3')}
+      ${renderGallerySlot(s.id, 3, 'Caption 4', 'Description for photo 4')}
+      <div class="add-gallery-photo" onclick="addGallerySlot('${s.id}')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Photo
+      </div>
+    </div>
+  `;
+}
+
+function renderGallerySlot(sectionId, index, caption, description) {
+  return `
+    <div class="gallery-item" data-index="${index}" style="position:relative">
+      <div class="gallery-drag-handle" title="Drag to reorder">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+      </div>
+      <div class="gallery-photo-placeholder" onclick="uploadGalleryPhoto('${sectionId}', ${index})">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Upload Photo
+      </div>
+      <p class="caption" contenteditable="true">${caption || ''}</p>
+      <p class="gallery-description" contenteditable="true" style="font-size:9pt;color:#555;font-style:normal;outline:none;min-height:1em;margin-top:2pt;font-family:'Times New Roman',serif" data-placeholder="Add description...">${description || ''}</p>
+    </div>
+  `;
+}
+
+function renderCustomTable(s) {
+  return `
+    <h2 class="section-heading" contenteditable="true">${s.name || 'Custom Table'}</h2>
+    <div style="position:relative">
+      <div class="table-actions">
+        <button class="table-action-btn" onclick="addParticipantRow(this)">+ Row</button>
+        <button class="table-action-btn" onclick="removeLastRow(this)">− Row</button>
+        <button class="table-action-btn" onclick="addTableColumn(this)">+ Column</button>
+        <button class="table-action-btn" onclick="removeLastColumn(this)">− Column</button>
+        <button class="table-action-btn" onclick="toggleTableBorder(this)">Toggle Border</button>
+        <button class="table-action-btn" onclick="mergeCells(this)">Merge Cells</button>
+      </div>
+      <table class="participant-table bordered">
+        <thead><tr><th contenteditable="true">Header 1</th><th contenteditable="true">Header 2</th><th contenteditable="true">Header 3</th></tr></thead>
+        <tbody>
+          <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+          <tr><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderListSection(s) {
+  return `
+    <h2 class="section-heading" contenteditable="true">${s.name || 'List'}</h2>
+    <div style="position:relative">
+      <div class="table-actions">
+        <button class="table-action-btn" onclick="addListItem(this)">+ Item</button>
+      </div>
+      <ul style="padding-left:20pt;margin:8pt 0">
+        <li contenteditable="true" style="margin-bottom:4pt">Item 1</li>
+        <li contenteditable="true" style="margin-bottom:4pt">Item 2</li>
+        <li contenteditable="true" style="margin-bottom:4pt">Item 3</li>
+      </ul>
+    </div>
+  `;
+}
+
+// ============================================
+// 4. SECTION MANAGEMENT
+// ============================================
+function toggleSection(id, visible) {
+  const section = sections.find(s => s.id === id);
+  if (section) {
+    section.visible = visible;
+    const el = document.getElementById('section-' + id);
+    if (el) el.classList.toggle('hidden-section', !visible);
+    // Also dim the page wrapper (don't fully hide — keeps layout)
+    const page = document.getElementById('doc-page-' + id);
+    if (page) page.style.opacity = visible ? '' : '0.35';
+    triggerSave();
+    pushUndoState();
+  }
+}
+
+function scrollToSection(id) {
+  activeSectionId = id;
+  const el = document.getElementById('section-' + id);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.style.outline = '2px solid var(--accent)';
+    el.style.outlineOffset = '4px';
+    setTimeout(() => {
+      el.style.outline = '';
+      el.style.outlineOffset = '';
+    }, 1500);
+  }
+  // Update active state
+  document.querySelectorAll('.section-item').forEach(item => item.classList.remove('active'));
+  const sidebarItem = document.querySelector(`.section-item[data-id="${id}"]`);
+  if (sidebarItem) sidebarItem.classList.add('active');
+}
+
+function duplicateSection(id) {
+  const idx = sections.findIndex(s => s.id === id);
+  if (idx === -1) return;
+
+  const original = sections[idx];
+  const newId = 'section-' + Date.now();
+  const newSection = { ...JSON.parse(JSON.stringify(original)), id: newId, name: original.name + ' (Copy)' };
+
+  sections.splice(idx + 1, 0, newSection);
+
+  // Clone the doc-page div
+  const originalPage = document.getElementById('doc-page-' + id);
+  if (originalPage) {
+    const clone = originalPage.cloneNode(true);
+    clone.id = 'doc-page-' + newId;
+    clone.setAttribute('data-page-section', newId);
+    const innerSection = clone.querySelector('.doc-section');
+    if (innerSection) {
+      innerSection.id = 'section-' + newId;
+      innerSection.setAttribute('data-section-id', newId);
+    }
+    originalPage.after(clone);
+    makeContentEditable(clone);
+  }
+
+  _refreshPageLabels();
+  renderSidebar();
+  initSortable();
+  triggerSave();
+  pushUndoState();
+  showToast('Section duplicated');
+}
+
+function showAddSectionModal() {
+  document.getElementById('add-section-modal').classList.add('visible');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('visible');
+}
+
+function deleteSection(id) {
+  const section = sections.find(s => s.id === id);
+  if (!section) return;
+  if (section.type === 'title') { showToast('Cannot delete the title page', 'error'); return; }
+  if (!confirm(`Delete section "${section.name}"? This cannot be undone.`)) return;
+
+  sections = sections.filter(s => s.id !== id);
+
+  // Remove the whole doc-page wrapper
+  const page = document.getElementById('doc-page-' + id);
+  if (page) page.remove();
+
+  if (activeSectionId === id) activeSectionId = null;
+  _refreshPageLabels();
+  renderSidebar();
+  initSortable();
+  triggerSave();
+  pushUndoState();
+  showToast('Section deleted');
+}
+
+function renameSection(id) {
+  const section = sections.find(s => s.id === id);
+  if (!section) return;
+  const newName = prompt('Enter new section name:', section.name);
+  if (!newName || !newName.trim()) return;
+  section.name = newName.trim();
+
+  // Update heading in DOM
+  const el = document.getElementById('section-' + id);
+  if (el) {
+    const heading = el.querySelector('.section-heading');
+    if (heading) heading.textContent = section.name;
+  }
+
+  renderSidebar();
+  triggerSave();
+  pushUndoState();
+  showToast('Section renamed');
+}
+
+function addSection(type) {
+  closeModal('add-section-modal');
+
+  if (type === 'table') {
+    document.getElementById('table-builder-modal').classList.add('visible');
+    return;
+  }
+
+  const id = 'custom-' + Date.now();
+  const nameMap = { text: 'New Section', gallery: 'Photo Gallery', list: 'List Section' };
+  const newSection = { id, name: nameMap[type] || 'New Section', type, visible: true };
+
+  const activeIdx = activeSectionId ? sections.findIndex(s => s.id === activeSectionId) : -1;
+  if (activeIdx >= 0 && sections[activeIdx].type !== 'title') {
+    sections.splice(activeIdx + 1, 0, newSection);
+  } else {
+    sections.push(newSection);
+  }
+
+  // Build the new doc-page div
+  const pageDiv = _buildPageDiv(newSection);
+
+  // Insert into DOM
+  if (activeSectionId) {
+    const activePage = document.getElementById('doc-page-' + activeSectionId);
+    if (activePage) {
+      activePage.after(pageDiv);
+    } else {
+      document.getElementById('document').appendChild(pageDiv);
+    }
+  } else {
+    document.getElementById('document').appendChild(pageDiv);
+  }
+
+  makeContentEditable(pageDiv);
+  _refreshPageLabels();
+  renderSidebar();
+  initSortable();
+  triggerSave();
+  pushUndoState();
+  scrollToSection(id);
+  showToast('Section added');
+}
+
+// Helper: build a full doc-page div for a section
+function _buildPageDiv(s) {
+  const isTitle = s.type === 'title';
+  const hiddenClass = s.visible ? '' : 'hidden-section';
+  const pageDiv = document.createElement('div');
+  pageDiv.className = 'doc-page';
+  pageDiv.id = 'doc-page-' + s.id;
+  pageDiv.setAttribute('data-page-section', s.id);
+  pageDiv.style.position = 'relative';
+
+  let innerHTML = '';
+  switch(s.type) {
+    case 'title':             innerHTML = renderTitlePage(s);         break;
+    case 'detail-table':      innerHTML = renderDetailTable(s);       break;
+    case 'text':              innerHTML = renderTextSection(s);       break;
+    case 'participant-table': innerHTML = renderParticipantTable(s);  break;
+    case 'gallery':           innerHTML = renderGallery(s);           break;
+    case 'table':             innerHTML = renderCustomTable(s);        break;
+    case 'list':              innerHTML = renderListSection(s);        break;
+  }
+
+  pageDiv.innerHTML = `
+    <div class="page-number-badge">—</div>
+    <div class="doc-section ${hiddenClass}" id="section-${s.id}" data-section-id="${s.id}">
+      ${innerHTML}
+    </div>`;
+  return pageDiv;
+}
+
+// Helper: re-number all page-number-badge labels after any DOM reorder
+function _refreshPageLabels() {
+  const doc = document.getElementById('document');
+  let contentNum = 0;
+  sections.forEach(s => {
+    const page = document.getElementById('doc-page-' + s.id);
+    if (!page) return;
+    const badge = page.querySelector('.page-number-badge');
+    if (!badge) return;
+    badge.textContent = s.type === 'title' ? 'Title Page' : `Page ${++contentNum}`;
+  });
+}
+
+function insertCustomTable() {
+  closeModal('table-builder-modal');
+
+  const rows = parseInt(document.getElementById('tb-rows').value) || 3;
+  const cols = parseInt(document.getElementById('tb-cols').value) || 3;
+  const hasHeader = document.getElementById('tb-header').checked;
+  const borderStyle = document.getElementById('tb-border').value;
+
+  const id = 'table-' + Date.now();
+  const newSection = { id, name: 'Custom Table', type: 'table', visible: true };
+
+  let tableHTML = `<h2 class="section-heading" contenteditable="true">Custom Table</h2>
+    <div style="position:relative">
+      <div class="table-actions">
+        <button class="table-action-btn" onclick="addParticipantRow(this)">+ Row</button>
+        <button class="table-action-btn" onclick="removeLastRow(this)">− Row</button>
+        <button class="table-action-btn" onclick="addTableColumn(this)">+ Column</button>
+        <button class="table-action-btn" onclick="removeLastColumn(this)">− Column</button>
+        <button class="table-action-btn" onclick="toggleTableBorder(this)">Toggle Border</button>
+        <button class="table-action-btn" onclick="mergeCells(this)">Merge Selected</button>
+      </div>
+      <table class="participant-table ${borderStyle}">`;
+
+  if (hasHeader) {
+    tableHTML += '<thead><tr>';
+    for (let c = 0; c < cols; c++) tableHTML += `<th contenteditable="true">Header ${c+1}</th>`;
+    tableHTML += '</tr></thead>';
+  }
+
+  tableHTML += '<tbody>';
+  for (let r = 0; r < rows; r++) {
+    tableHTML += '<tr>';
+    for (let c = 0; c < cols; c++) tableHTML += `<td contenteditable="true"></td>`;
+    tableHTML += '</tr>';
+  }
+  tableHTML += '</tbody></table></div>';
+
+  // Insert into sections array
+  const activeIdx = activeSectionId ? sections.findIndex(s => s.id === activeSectionId) : -1;
+  if (activeIdx >= 0 && sections[activeIdx].type !== 'title') {
+    sections.splice(activeIdx + 1, 0, newSection);
+  } else {
+    sections.push(newSection);
+  }
+
+  // Build doc-page
+  const pageDiv = document.createElement('div');
+  pageDiv.className = 'doc-page';
+  pageDiv.id = 'doc-page-' + id;
+  pageDiv.setAttribute('data-page-section', id);
+  pageDiv.style.position = 'relative';
+  pageDiv.innerHTML = `
+    <div class="page-number-badge">—</div>
+    <div class="doc-section" id="section-${id}" data-section-id="${id}">${tableHTML}</div>`;
+
+  const docEl = document.getElementById('document');
+  if (activeSectionId) {
+    const activePage = document.getElementById('doc-page-' + activeSectionId);
+    if (activePage) { activePage.after(pageDiv); }
+    else { docEl.appendChild(pageDiv); }
+  } else {
+    docEl.appendChild(pageDiv);
+  }
+
+  makeContentEditable(pageDiv);
+  _refreshPageLabels();
+  renderSidebar();
+  initSortable();
+  triggerSave();
+  pushUndoState();
+  scrollToSection(id);
+  showToast('Table inserted');
+}
+
+// ============================================
+// 5. TABLE OPERATIONS
+// ============================================
+function addDetailRow(btn) {
+  const table = btn.closest('div').querySelector('table');
+  const tbody = table.querySelector('tbody') || table;
+  const cols = tbody.rows[0] ? tbody.rows[0].cells.length : 2;
+  const row = tbody.insertRow();
+  for (let i = 0; i < cols; i++) {
+    const cell = row.insertCell();
+    cell.contentEditable = true;
+    cell.textContent = '';
+  }
+  triggerSave();
+  pushUndoState();
+}
+
+function addParticipantRow(btn) {
+  const table = btn.closest('div').querySelector('table');
+  const tbody = table.querySelector('tbody');
+  const cols = (tbody.rows[0] || table.querySelector('thead tr')).cells.length;
+  const row = tbody.insertRow();
+  for (let i = 0; i < cols; i++) {
+    const cell = row.insertCell();
+    cell.contentEditable = true;
+    if (i === 0) cell.textContent = tbody.rows.length;
+  }
+  triggerSave();
+  pushUndoState();
+}
+
+function removeLastRow(btn) {
+  const table = btn.closest('div').querySelector('table');
+  const tbody = table.querySelector('tbody') || table;
+  if (tbody.rows.length > 1) {
+    tbody.deleteRow(tbody.rows.length - 1);
+    triggerSave();
+    pushUndoState();
+  }
+}
+
+function addTableColumn(btn) {
+  const table = btn.closest('div').querySelector('table');
+  const thead = table.querySelector('thead');
+  const tbody = table.querySelector('tbody');
+  
+  if (thead) {
+    thead.querySelectorAll('tr').forEach(row => {
+      const th = document.createElement('th');
+      th.contentEditable = true;
+      th.textContent = 'New';
+      row.appendChild(th);
+    });
+  }
+  
+  if (tbody) {
+    tbody.querySelectorAll('tr').forEach(row => {
+      const td = document.createElement('td');
+      td.contentEditable = true;
+      row.appendChild(td);
+    });
+  }
+  triggerSave();
+  pushUndoState();
+}
+
+function removeLastColumn(btn) {
+  const table = btn.closest('div').querySelector('table');
+  const allRows = table.querySelectorAll('tr');
+  if (allRows[0] && allRows[0].cells.length > 1) {
+    allRows.forEach(row => {
+      if (row.cells.length > 0) {
+        row.deleteCell(row.cells.length - 1);
+      }
+    });
+    triggerSave();
+    pushUndoState();
+  }
+}
+
+function toggleTableBorder(btn) {
+  const table = btn.closest('div').querySelector('table');
+  const styles = ['bordered', 'booktabs', 'none'];
+  let currentIdx = styles.findIndex(s => table.classList.contains(s));
+  if (currentIdx === -1) currentIdx = 0;
+  table.classList.remove(...styles);
+  const nextStyle = styles[(currentIdx + 1) % styles.length];
+  if (nextStyle !== 'none') table.classList.add(nextStyle);
+  
+  // Update styling for "none"
+  if (nextStyle === 'none') {
+    table.style.border = 'none';
+    table.querySelectorAll('td, th').forEach(c => c.style.border = 'none');
+  } else {
+    table.style.border = '';
+    table.querySelectorAll('td, th').forEach(c => c.style.border = '');
+  }
+  triggerSave();
+}
+
+function mergeCells(btn) {
+  const table = btn.closest('div').querySelector('table');
+  // Collect all cells that have a 'selected-for-merge' class (user ctrl+clicks them)
+  const selected = Array.from(table.querySelectorAll('td.selected-for-merge, th.selected-for-merge'));
+  if (selected.length < 2) {
+    // Enter selection mode: Ctrl+click cells to select, then click Merge again
+    showToast('Ctrl+click cells to select, then click Merge Cells');
+    // Enable cell selection click handlers
+    table.querySelectorAll('td, th').forEach(cell => {
+      cell.style.cursor = 'cell';
+      cell.ondblclick = null;
+      cell.onclick = function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          cell.classList.toggle('selected-for-merge');
+          cell.style.background = cell.classList.contains('selected-for-merge')
+            ? 'rgba(26,60,110,0.15)' : '';
+        }
+      };
+    });
+    return;
+  }
+
+  // Determine bounding box
+  const rows = Array.from(table.querySelectorAll('tr'));
+  let minRow = Infinity, maxRow = -Infinity, minCol = Infinity, maxCol = -Infinity;
+  selected.forEach(cell => {
+    const row = cell.parentElement;
+    const rowIdx = rows.indexOf(row);
+    const colIdx = Array.from(row.cells).indexOf(cell);
+    minRow = Math.min(minRow, rowIdx);
+    maxRow = Math.max(maxRow, rowIdx);
+    minCol = Math.min(minCol, colIdx);
+    maxCol = Math.max(maxCol, colIdx);
+  });
+
+  const rowSpan = maxRow - minRow + 1;
+  const colSpan = maxCol - minCol + 1;
+
+  // Merge: keep top-left cell, remove others
+  const topLeftRow = rows[minRow];
+  const topLeftCell = topLeftRow.cells[minCol];
+  // Collect text from all selected cells
+  const mergedText = selected.map(c => c.textContent.trim()).filter(Boolean).join(' ');
+
+  selected.forEach(cell => {
+    if (cell !== topLeftCell) cell.remove();
+  });
+
+  topLeftCell.rowSpan = rowSpan;
+  topLeftCell.colSpan = colSpan;
+  topLeftCell.textContent = mergedText;
+  topLeftCell.classList.remove('selected-for-merge');
+  topLeftCell.style.background = '';
+
+  // Reset click handlers
+  table.querySelectorAll('td, th').forEach(cell => {
+    cell.style.cursor = '';
+    cell.onclick = null;
+    cell.classList.remove('selected-for-merge');
+    cell.style.background = '';
+  });
+
+  triggerSave();
+  pushUndoState();
+  showToast('Cells merged');
+}
+
+function addListItem(btn) {
+  const ul = btn.closest('div').querySelector('ul');
+  const li = document.createElement('li');
+  li.contentEditable = true;
+  li.style.marginBottom = '4pt';
+  li.textContent = 'New item';
+  ul.appendChild(li);
+  li.focus();
+  triggerSave();
+  pushUndoState();
+}
+
+// ============================================
+// 6. LOGO MANAGEMENT
+// ============================================
+function handleLogoUpload(slot, event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const container = document.getElementById('logo-' + slot);
+    container.innerHTML = `
+      <img src="${e.target.result}" alt="${slot} logo">
+      <div class="logo-overlay">
+        <button class="replace-btn" onclick="document.getElementById('logo-${slot}-input').click()">Replace</button>
+        <button class="remove-btn" onclick="removeLogo('${slot}')">Remove</button>
+      </div>
+    `;
+    triggerSave();
+    pushUndoState();
+    showToast('Logo uploaded');
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function removeLogo(slot) {
+  const container = document.getElementById('logo-' + slot);
+  const label = slot === 'left' ? 'College Logo' : 'NSS Logo';
+  container.innerHTML = `
+    <div class="logo-placeholder" onclick="document.getElementById('logo-${slot}-input').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span>${label}</span>
+    </div>
+  `;
+  triggerSave();
+  pushUndoState();
+}
+
+// ============================================
+// 7. MAIN PHOTO
+// ============================================
+function handleMainPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const container = document.getElementById('main-photo-area');
+    container.innerHTML = `
+      <img src="${e.target.result}" alt="Main Photo" style="width:100%;border-radius:2px">
+      <div class="logo-overlay" style="border-radius:2px">
+        <button class="replace-btn" onclick="document.getElementById('main-photo-input').click()">Replace</button>
+        <button class="remove-btn" onclick="removeMainPhoto()">Remove</button>
+      </div>
+    `;
+    triggerSave();
+    pushUndoState();
+    showToast('Photo uploaded');
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function removeMainPhoto() {
+  const container = document.getElementById('main-photo-area');
+  container.innerHTML = `
+    <div class="photo-placeholder" onclick="document.getElementById('main-photo-input').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span>Click to upload main photo</span>
+    </div>
+  `;
+  triggerSave();
+  pushUndoState();
+}
+
+// ============================================
+// 8. PHOTO GALLERY
+// ============================================
+function uploadGalleryPhoto(sectionId, index) {
+  gallerySectionTarget = { sectionId, index };
+  const input = document.getElementById('gallery-photo-input');
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file || !gallerySectionTarget) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const gallery = document.getElementById('gallery-' + gallerySectionTarget.sectionId);
+      const items = gallery.querySelectorAll('.gallery-item');
+      const item = items[gallerySectionTarget.index];
+      
+      if (item) {
+        const placeholder = item.querySelector('.gallery-photo-placeholder');
+        if (placeholder) {
+          placeholder.outerHTML = `
+            <img src="${ev.target.result}" alt="Gallery photo">
+            <div class="gallery-photo-overlay">
+              <button onclick="replaceGalleryPhoto('${gallerySectionTarget.sectionId}', ${gallerySectionTarget.index})">Replace</button>
+              <button class="remove-photo-btn" onclick="removeGalleryPhoto('${gallerySectionTarget.sectionId}', ${gallerySectionTarget.index})">Remove</button>
+            </div>
+          `;
+        } else {
+          const img = item.querySelector('img');
+          if (img) img.src = ev.target.result;
+        }
+        triggerSave();
+        pushUndoState();
+        showToast('Photo added');
+      }
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  };
+  input.click();
+}
+
+function replaceGalleryPhoto(sectionId, index) {
+  uploadGalleryPhoto(sectionId, index);
+}
+
+function removeGalleryPhoto(sectionId, index) {
+  const gallery = document.getElementById('gallery-' + sectionId);
+  const items = gallery.querySelectorAll('.gallery-item');
+  if (items[index]) {
+    items[index].remove();
+    triggerSave();
+    pushUndoState();
+  }
+}
+
+function addGallerySlot(sectionId) {
+  const gallery = document.getElementById('gallery-' + sectionId);
+  const items = gallery.querySelectorAll('.gallery-item');
+  if (items.length >= 8) {
+    showToast('Maximum 8 photos allowed', 'error');
+    return;
+  }
+  
+  const addBtn = gallery.querySelector('.add-gallery-photo');
+  const div = document.createElement('div');
+  div.className = 'gallery-item';
+  div.style.position = 'relative';
+  div.setAttribute('data-index', items.length);
+  div.innerHTML = `
+    <div class="gallery-drag-handle" title="Drag to reorder">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+    </div>
+    <div class="gallery-photo-placeholder" onclick="uploadGalleryPhoto('${sectionId}', ${items.length})">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Upload Photo
+    </div>
+    <p class="caption" contenteditable="true"></p>
+    <p class="gallery-description" contenteditable="true" style="font-size:9pt;color:#555;font-style:normal;outline:none;min-height:1em;margin-top:2pt;font-family:'Times New Roman',serif"></p>
+  `;
+  
+  gallery.insertBefore(div, addBtn);
+  
+  // Init gallery sortable
+  initGallerySortable(sectionId);
+  triggerSave();
+  pushUndoState();
+}
+
+function initGallerySortable(sectionId) {
+  const gallery = document.getElementById('gallery-' + sectionId);
+  if (!gallery) return;
+
+  if (gallery._sortable) gallery._sortable.destroy();
+
+  gallery._sortable = new Sortable(gallery, {
+    animation: 200,
+    handle: '.gallery-drag-handle',
+    draggable: '.gallery-item',
+    ghostClass: 'sortable-ghost',
+    onEnd: () => {
+      // Refresh data-index attributes after reorder
+      const items = gallery.querySelectorAll('.gallery-item');
+      items.forEach((item, i) => {
+        item.setAttribute('data-index', i);
+        // Update upload placeholder onclick
+        const ph = item.querySelector('.gallery-photo-placeholder');
+        if (ph) ph.setAttribute('onclick', `uploadGalleryPhoto('${sectionId}', ${i})`);
+        // Update overlay replace/remove buttons
+        const overlay = item.querySelector('.gallery-photo-overlay');
+        if (overlay) {
+          const btns = overlay.querySelectorAll('button');
+          if (btns[0]) btns[0].setAttribute('onclick', `replaceGalleryPhoto('${sectionId}', ${i})`);
+          if (btns[1]) btns[1].setAttribute('onclick', `removeGalleryPhoto('${sectionId}', ${i})`);
+        }
+      });
+      triggerSave();
+      pushUndoState();
+    }
+  });
+}
+
+// ============================================
+// 9. RICH TEXT TOOLBAR
+// ============================================
+function initRichToolbar() {
+  document.addEventListener('mouseup', (e) => {
+    if (document.body.classList.contains('print-preview')) return;
+    
+    setTimeout(() => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+        hideRichToolbar();
+        return;
+      }
+      
+      // Check if selection is within the document area
+      const range = selection.getRangeAt(0);
+      const container = range.commonAncestorContainer;
+      const docArea = document.getElementById('document');
+      
+      if (!docArea.contains(container)) {
+        hideRichToolbar();
+        return;
+      }
+      
+      showRichToolbar(range);
+    }, 10);
+  });
+  
+  document.addEventListener('mousedown', (e) => {
+    const toolbar = document.getElementById('rich-toolbar');
+    if (toolbar.classList.contains('visible') && !toolbar.contains(e.target)) {
+      // Don't hide immediately, let mouseup decide
+    }
+  });
+  
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideRichToolbar();
+  });
+}
+
+function showRichToolbar(range) {
+  const toolbar = document.getElementById('rich-toolbar');
+  const rect = range.getBoundingClientRect();
+  
+  toolbar.classList.add('visible');
+  
+  // Position above selection
+  let top = rect.top - toolbar.offsetHeight - 10 + window.scrollY;
+  let left = rect.left + (rect.width / 2) - (toolbar.offsetWidth / 2);
+  
+  // Keep within viewport
+  if (top < 60) top = rect.bottom + 10 + window.scrollY;
+  if (left < 10) left = 10;
+  if (left + toolbar.offsetWidth > window.innerWidth - 10) {
+    left = window.innerWidth - toolbar.offsetWidth - 10;
+  }
+  
+  toolbar.style.top = top + 'px';
+  toolbar.style.left = left + 'px';
+}
+
+function hideRichToolbar() {
+  document.getElementById('rich-toolbar').classList.remove('visible');
+}
+
+function execCmd(command) {
+  document.execCommand(command, false, null);
+  triggerSave();
+}
+
+function execCmdVal(command, value) {
+  document.execCommand(command, false, value);
+  triggerSave();
+}
+
+function applyFont(font) {
+  document.execCommand('fontName', false, font);
+  triggerSave();
+}
+
+function applyFontSize(size) {
+  document.execCommand('fontSize', false, size);
+  triggerSave();
+}
+
+// ============================================
+// 10. DRAG & DROP (Sortable)
+// ============================================
+function initSortable() {
+  const sidebarList = document.getElementById('section-list');
+  if (sidebarList._sortable) sidebarList._sortable.destroy();
+
+  sidebarList._sortable = new Sortable(sidebarList, {
+    animation: 200,
+    handle: '.drag-handle',
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: (evt) => {
+      // Reorder sections array
+      const item = sections.splice(evt.oldIndex, 1)[0];
+      sections.splice(evt.newIndex, 0, item);
+
+      // Reorder doc-page divs to match
+      const docEl = document.getElementById('document');
+      const pages = sections.map(s => document.getElementById('doc-page-' + s.id)).filter(Boolean);
+      pages.forEach(p => docEl.appendChild(p)); // re-append in order
+
+      _refreshPageLabels();
+      triggerSave();
+      pushUndoState();
+    }
+  });
+
+  // Init gallery sortables
+  sections.forEach(s => {
+    if (s.type === 'gallery') initGallerySortable(s.id);
+  });
+}
+
+// ============================================
+// 11. THEME & DARK MODE
+// ============================================
+function renderColorPalette() {
+  const palette = document.getElementById('color-palette');
+  palette.innerHTML = ACCENT_COLORS.map(c => 
+    `<div class="color-swatch ${c.value === currentAccent ? 'active' : ''}" 
+          style="background:${c.value}" 
+          title="${c.name}" 
+          onclick="setAccentColor('${c.value}')"></div>`
+  ).join('');
+}
+
+function setAccentColor(color) {
+  currentAccent = color;
+  document.documentElement.style.setProperty('--accent', color);
+  
+  // Lighten for accent-light
+  const r = parseInt(color.slice(1,3), 16);
+  const g = parseInt(color.slice(3,5), 16);
+  const b = parseInt(color.slice(5,7), 16);
+  const light = `rgb(${Math.min(255,r+30)},${Math.min(255,g+30)},${Math.min(255,b+30)})`;
+  document.documentElement.style.setProperty('--accent-light', light);
+  document.documentElement.style.setProperty('--accent-lighter', `rgba(${r},${g},${b},0.1)`);
+  
+  document.getElementById('custom-accent').value = color;
+  
+  // Update section headings border color in document
+  document.querySelectorAll('.section-heading').forEach(h => {
+    h.style.borderBottomColor = '#000';
+  });
+  
+  renderColorPalette();
+  triggerSave();
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle('dark-mode');
+  triggerSave();
+  showToast(document.body.classList.contains('dark-mode') ? 'Dark mode enabled' : 'Dark mode disabled');
+}
+
+// ============================================
+// 12. AUTO-SAVE
+// ============================================
+// ============================================
+// 12. STATE TRACKING (no localStorage)
+// ============================================
+function initAutoSave() { /* removed */ }
+
+function triggerSave() {
+  // No-op: localStorage auto-save removed
+}
+
+function saveToStorage() {
+  // No-op: localStorage auto-save removed
+}
+
+// ============================================
+// 13. IMPORT / EXPORT PROJECT
+// ============================================
+function exportProject() {
+  const data = {
+    sections,
+    accent: currentAccent,
+    darkMode: document.body.classList.contains('dark-mode'),
+    documentHTML: document.getElementById('document').innerHTML,
+    exportDate: new Date().toISOString(),
+    version: '1.0'
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'nss-report-project.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Project exported as JSON', 'success');
+}
+
+function importProject(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.sections) sections = data.sections;
+      if (data.accent) {
+        currentAccent = data.accent;
+        document.documentElement.style.setProperty('--accent', currentAccent);
+        document.getElementById('custom-accent').value = currentAccent;
+        renderColorPalette();
+      }
+      if (data.darkMode) {
+        document.body.classList.add('dark-mode');
+      } else {
+        document.body.classList.remove('dark-mode');
+      }
+      if (data.documentHTML) {
+        document.getElementById('document').innerHTML = data.documentHTML;
+        reattachEventListeners();
+      } else {
+        renderDocument();
+      }
+      renderSidebar();
+      initSortable();
+      saveToStorage();
+      pushUndoState();
+      showToast('Project loaded successfully', 'success');
+    } catch(err) {
+      showToast('Failed to load project: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ============================================
+// 14. PDF EXPORT
+// ============================================
+function exportPDF() {
+  showToast('Generating PDF...');
+
+  const doc = document.getElementById('document');
+  const clone = doc.cloneNode(true);
+
+  // Strip editor-only UI
+  clone.querySelectorAll(
+    '.table-actions, .logo-overlay, .gallery-photo-overlay, ' +
+    '.add-gallery-photo, .logo-placeholder, .photo-placeholder, ' +
+    '.gallery-photo-placeholder, .page-number-badge, .gallery-drag-handle'
+  ).forEach(el => el.remove());
+
+  clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+  clone.querySelectorAll('.hidden-section').forEach(el => el.remove());
+  clone.querySelectorAll('.body-text').forEach(el => { if (!el.textContent.trim()) el.remove(); });
+
+  // Flatten multi-page divs: remove the doc-page wrapper ids to avoid conflicts
+  clone.querySelectorAll('.doc-page').forEach(page => {
+    page.removeAttribute('id');
+    page.removeAttribute('style');
+  });
+
+  // Build an isolated container that html2canvas can reliably capture
+  const container = document.createElement('div');
+  container.style.cssText = [
+    'position:absolute',
+    'top:0',
+    'left:0',
+    'width:794px',          // 210 mm @ 96 dpi — exact integer avoids sub-pixel drift
+    'background:#fff',
+    'z-index:-1',
+    'visibility:hidden',
+    'font-family:"Times New Roman",Times,serif',
+    'font-size:16px',       // 12pt ≡ 16px at 96dpi
+    'line-height:1.15',
+    'color:#000',
+    'box-sizing:border-box',
+  ].join(';');
+
+  // Inject styles that override editor CSS inside this container
+  const style = document.createElement('style');
+  style.textContent = `
+    #__pdf_root *, #__pdf_root *::before, #__pdf_root *::after {
+      box-sizing: border-box !important;
+    }
+    #__pdf_root .doc-page {
+      width: 794px !important;
+      min-height: 1123px !important;
+      padding: 113px 96px !important; /* 30mm / 25.4mm at 96 dpi */
+      background: white !important;
+      page-break-after: always !important;
+      break-after: page !important;
+      position: relative;
+      box-sizing: border-box !important;
+    }
+    #__pdf_root .doc-page::before,
+    #__pdf_root .doc-page::after { display: none !important; }
+    #__pdf_root .doc-section:hover { outline: none !important; }
+    #__pdf_root .title-page { text-align: center; }
+    #__pdf_root .logo-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    #__pdf_root .logo-slot { width: 48%; display: flex; justify-content: center; }
+    #__pdf_root .logo-slot img { max-width: 96px; max-height: 96px; object-fit: contain; }
+    #__pdf_root .college-name { font-size: 18px; font-weight: bold; margin: 0; }
+    #__pdf_root .department-line { font-size: 13px; margin-bottom: 16px; }
+    #__pdf_root .unit-number { font-size: 17px; font-weight: bold; margin-bottom: 32px; }
+    #__pdf_root .report-title { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+    #__pdf_root .programme-name { font-size: 24px; font-weight: bold; line-height: 1.3; margin-bottom: 13px; }
+    #__pdf_root .date-venue { font-size: 16px; margin-bottom: 26px; }
+    #__pdf_root .main-photo-container { max-width: 60%; margin: 13px auto 26px; }
+    #__pdf_root .main-photo-container img { width: 100%; border-radius: 2px; }
+    #__pdf_root .prepared-by { font-weight: bold; font-size: 16px; line-height: 1.5; }
+    #__pdf_root .section-heading {
+      font-size: 18px; font-weight: bold; text-transform: uppercase;
+      padding-bottom: 8px; border-bottom: 1px solid #000;
+      margin-top: 18px; margin-bottom: 13px;
+    }
+    #__pdf_root .body-text { text-align: justify; margin-bottom: 11px; font-size: 16px; }
+    #__pdf_root .details-table { width: 100%; border-collapse: collapse; margin: 13px 0; font-size: 16px; }
+    #__pdf_root .details-table td { padding: 8px 13px; text-align: left; vertical-align: top; }
+    #__pdf_root .details-table td:first-child { font-weight: bold; white-space: nowrap; }
+    #__pdf_root .details-table.booktabs { border-top: 2px solid #000; border-bottom: 2px solid #000; }
+    #__pdf_root .details-table.booktabs thead tr { border-bottom: 1px solid #000; }
+    #__pdf_root .participant-table { width: 100%; border-collapse: collapse; margin: 13px 0; font-size: 16px; }
+    #__pdf_root .participant-table th, #__pdf_root .participant-table td { padding: 6px 16px; border: 1px solid #000; }
+    #__pdf_root .participant-table th { font-weight: bold; text-align: center; }
+    #__pdf_root .photo-gallery { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin: 11px 0; }
+    #__pdf_root .gallery-item { width: calc(50% - 10px); text-align: center; }
+    #__pdf_root .gallery-item img { width: 95%; margin: 0 auto; display: block; }
+    #__pdf_root .caption { font-size: 13px; margin-top: 5px; font-style: italic; }
+    #__pdf_root .gallery-description { font-size: 12px; color: #444; margin-top: 2px; }
+    #__pdf_root .hidden-section { display: none !important; }
+  `;
+  container.id = '__pdf_root';
+  container.appendChild(style);
+  container.appendChild(clone);
+  document.body.appendChild(container);
+
+  const opt = {
+    margin: 0,
+    filename: 'NSS_Programme_Report.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      letterRendering: true,
+      scrollX: 0,
+      scrollY: 0,
+      width: 794,
+      windowWidth: 794,
+      windowHeight: 1123,  // 297mm at 96dpi
+      backgroundColor: '#ffffff',
+    },
+    jsPDF: {
+      unit: 'mm',
+      format: 'a4',
+      orientation: 'portrait',
+      compress: true,
+    },
+    pagebreak: { mode: ['css'], before: '.doc-page', avoid: ['tr', '.gallery-item'] }
+  };
+
+  html2pdf().set(opt).from(container).toPdf().get('pdf').then(function(pdf) {
+    const totalPages = pdf.internal.getNumberOfPages();
+    const pageWidth  = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    // Count how many visible sections there are so we know the title page index
+    // Page 1 in jsPDF = title page (no number). Pages 2+ = content numbered 1, 2, 3…
+    let contentNum = 0;
+
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+
+      // Outer border
+      pdf.setLineWidth(0.53);
+      pdf.setDrawColor(0, 0, 0);
+      pdf.rect(6, 6, pageWidth - 12, pageHeight - 12);
+      // Inner border
+      pdf.setLineWidth(0.18);
+      pdf.rect(8, 8, pageWidth - 16, pageHeight - 16);
+
+      // Page number: skip title page (page 1), number rest 1, 2, 3…
+      if (i > 1) {
+        contentNum++;
+        pdf.setFontSize(10);
+        pdf.setFont('times', 'normal');
+        pdf.text(String(contentNum), pageWidth / 2, pageHeight - 5, { align: 'center' });
+      }
+    }
+  }).save().then(() => {
+    document.body.removeChild(container);
+    showToast('PDF exported successfully!', 'success');
+  }).catch(err => {
+    if (document.body.contains(container)) document.body.removeChild(container);
+    showToast('PDF export failed: ' + err.message, 'error');
+    console.error('PDF export error:', err);
+  });
+}
+
+// ============================================
+// 15. DOCX EXPORT
+// ============================================
+function exportDOCX() {
+  const doc = document.getElementById('document');
+  const clone = doc.cloneNode(true);
+
+  // Clean up clone
+  clone.querySelectorAll('.table-actions, .logo-overlay, .gallery-photo-overlay, .add-gallery-photo, .page-number-badge, .gallery-drag-handle').forEach(el => el.remove());
+  clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+  clone.querySelectorAll('.hidden-section').forEach(el => el.remove());
+  clone.querySelectorAll('.logo-placeholder, .photo-placeholder, .gallery-photo-placeholder').forEach(el => el.remove());
+  clone.querySelectorAll('.doc-page').forEach(page => {
+    page.style.cssText = '';
+    page.removeAttribute('id');
+  });
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4; margin: 1in; }
+    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.15; }
+    .title-page { text-align: center; page-break-after: always; }
+    .section-heading { font-size: 14pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4pt; margin-top: 14pt; margin-bottom: 10pt; }
+    .body-text { text-align: justify; margin-bottom: 8pt; }
+    table { border-collapse: collapse; width: 100%; margin: 10pt 0; }
+    th, td { padding: 5pt 10pt; border: 1px solid #000; }
+    th { font-weight: bold; text-align: center; }
+    .college-name { font-size: 14pt; font-weight: bold; }
+    .programme-name { font-size: 18pt; font-weight: bold; }
+    .caption { font-size: 10pt; font-style: italic; text-align: center; }
+    .gallery-description { font-size: 9pt; text-align: center; }
+    img { max-width: 100%; }
+    .photo-gallery { display: flex; flex-wrap: wrap; gap: 10pt; }
+    .gallery-item { width: 45%; text-align: center; }
+    .gallery-item img { width: 100%; }
+    .doc-page { page-break-after: always; }
+  </style>
+</head>
+<body>${clone.innerHTML}</body>
+</html>`;
+
+  try {
+    if (typeof htmlDocx !== 'undefined' && htmlDocx.asBlob) {
+      const blob = htmlDocx.asBlob(htmlContent, { orientation: 'portrait', margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 } });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'NSS_Programme_Report.docx';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('DOCX exported successfully!', 'success');
+    } else {
+      throw new Error('html-docx-js not loaded');
+    }
+  } catch(err) {
+    console.warn('DOCX export fallback:', err);
+    // Fallback: Word XML blob
+    const blob = new Blob(['\ufeff' + htmlContent], {
+      type: 'application/msword'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'NSS_Programme_Report.doc';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported as .doc (Word format)', 'success');
+  }
+}
+
+// ============================================
+// 16. UNDO / REDO
+// ============================================
+function pushUndoState() {
+  if (isUndoing) return;
+  
+  const state = {
+    documentHTML: document.getElementById('document').innerHTML,
+    sections: JSON.parse(JSON.stringify(sections)),
+    accent: currentAccent
+  };
+  
+  undoStack.push(state);
+  if (undoStack.length > 50) undoStack.shift();
+  redoStack = [];
+}
+
+function doUndo() {
+  if (undoStack.length <= 1) {
+    showToast('Nothing to undo');
+    return;
+  }
+  
+  isUndoing = true;
+  const current = undoStack.pop();
+  redoStack.push(current);
+  
+  const prev = undoStack[undoStack.length - 1];
+  restoreState(prev);
+  isUndoing = false;
+  triggerSave();
+}
+
+function doRedo() {
+  if (redoStack.length === 0) {
+    showToast('Nothing to redo');
+    return;
+  }
+  
+  isUndoing = true;
+  const state = redoStack.pop();
+  undoStack.push(state);
+  
+  restoreState(state);
+  isUndoing = false;
+  triggerSave();
+}
+
+function restoreState(state) {
+  if (state.documentHTML) {
+    document.getElementById('document').innerHTML = state.documentHTML;
+    reattachEventListeners();
+  }
+  if (state.sections) {
+    sections = JSON.parse(JSON.stringify(state.sections));
+    renderSidebar();
+    initSortable();
+  }
+  if (state.accent) {
+    setAccentColor(state.accent);
+  }
+}
+
+// ============================================
+// 17. PRINT PREVIEW
+// ============================================
+function togglePrintPreview() {
+  document.body.classList.toggle('print-preview');
+  
+  if (document.body.classList.contains('print-preview')) {
+    // Make all content non-editable
+    document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+      el.setAttribute('data-was-editable', 'true');
+      el.setAttribute('contenteditable', 'false');
+    });
+    showToast('Print Preview Mode - Press ESC or click Exit to return');
+  } else {
+    // Restore editability
+    document.querySelectorAll('[data-was-editable]').forEach(el => {
+      el.setAttribute('contenteditable', 'true');
+      el.removeAttribute('data-was-editable');
+    });
+  }
+}
+
+// ============================================
+// 18. KEYBOARD SHORTCUTS
+// ============================================
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + Z = Undo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      doUndo();
+    }
+    
+    // Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z = Redo
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      e.preventDefault();
+      doRedo();
+    }
+    
+    // Escape = Exit preview
+    if (e.key === 'Escape' && document.body.classList.contains('print-preview')) {
+      togglePrintPreview();
+    }
+    
+    // Ctrl/Cmd + S = Save
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveToStorage();
+      showToast('Saved!', 'success');
+    }
+    
+    // Ctrl/Cmd + P = Print Preview
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+      e.preventDefault();
+      togglePrintPreview();
+    }
+  });
+  
+  // Debounced undo state push on input
+  let undoTimeout = null;
+  document.getElementById('document').addEventListener('input', () => {
+    clearTimeout(undoTimeout);
+    undoTimeout = setTimeout(() => {
+      if (!isUndoing) pushUndoState();
+    }, 1000);
+  });
+}
+
+// ============================================
+// 19. UTILITY FUNCTIONS
+// ============================================
+function showToast(message, type = '') {
+  // Remove existing toast
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(20px)';
+    toast.style.transition = '0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+
+function reattachEventListeners() {
+  // Re-initialize gallery sortables
+  sections.forEach(s => {
+    if (s.type === 'gallery') {
+      initGallerySortable(s.id);
+    }
+  });
+}
+
+function makeContentEditable(container) {
+  container.querySelectorAll('.section-heading, .body-text, td, th, .caption, .college-name, .department-line, .unit-number, .report-title, .programme-name, .date-venue, .prepared-by, li').forEach(el => {
+    if (!el.hasAttribute('contenteditable')) {
+      el.contentEditable = true;
+    }
+  });
+}
+</script>
+</body>
+</html>
